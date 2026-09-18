@@ -12,6 +12,7 @@ from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
 from depscan.scanner import MultiScanner, Dependency
+from depscan.formatter import MarkdownFormatter
 
 console = Console()
 
@@ -33,8 +34,9 @@ def cli():
 @cli.command()
 @click.argument("path", default=".", type=click.Path(exists=True))
 @click.option("--json-output", "json_out", is_flag=True, help="Output as JSON")
+@click.option("--markdown", "markdown_out", is_flag=True, help="Output as Markdown report")
 @click.option("--typosquat/--no-typosquat", default=True, help="Check for typosquats")
-def scan(path, json_out, typosquat):
+def scan(path, json_out, markdown_out, typosquat):
     """Scan a directory for dependencies."""
     scanner = MultiScanner()
 
@@ -57,6 +59,11 @@ def scan(path, json_out, typosquat):
             "by_ecosystem": results["by_ecosystem"],
         }
         click.echo(json.dumps(output, indent=2))
+        return
+
+    if markdown_out:
+        formatter = MarkdownFormatter()
+        click.echo(formatter.format_full(results))
         return
 
     console.print(Panel(
