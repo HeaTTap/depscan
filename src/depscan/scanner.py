@@ -9,6 +9,16 @@ from datetime import datetime
 from pathlib import Path
 from typing import Iterator
 
+LOCK_PATTERNS = [
+    "Cargo.lock",
+    "package-lock.json",
+    "Pipfile.lock",
+    "requirements.txt",
+    "go.mod",
+    "poetry.lock",
+    "*.lock",
+]
+
 
 @dataclass
 class Vulnerability:
@@ -94,6 +104,39 @@ class DependencyParser:
         except json.JSONDecodeError:
             pass
         return deps
+
+    @staticmethod
+    def parse_pipfile_lock(content: str) -> list[Dependency]:
+        """Parse Pipfile.lock JSON format."""
+        deps = []
+        try:
+            data = json.loads(content)
+        except (json.JSONDecodeError, TypeError):
+            return deps
+        if not isinstance(data, dict):
+            return deps
+
+        for section in ("default", "develop"):
+            section_data = data.get(section)
+            if not isinstance(section_data, dict):
+                continue
+            for name, info in section_data.items():
+                if not isinstance(info, dict):
+                    continue
+                raw_version = info.get("version", "")
+                if not isinstance(raw_version, str):
+                    continue
+                version = raw_version.lstrip("=")
+                if not version:
+                    continue
+                deps.append(Dependency(
+                    name=name,
+                    version=version,
+                    ecosystem="pypi",
+                ))
+        return deps
+
+    parse_plfile_lock = parse_pipfile_lock
 
     @staticmethod
     def parse_requirements_txt(content: str) -> list[Dependency]:
@@ -276,6 +319,8 @@ class MultiScanner:
             return self.parser.parse_cargo_lock(content)
         elif "package-lock" in filename:
             return self.parser.parse_package_lock(content)
+        elif "pipfile.lock" in filename:
+            return self.parser.parse_pipfile_lock(content)
         elif "requirements" in filename:
             return self.parser.parse_requirements_txt(content)
         elif filename == "go.mod":
@@ -288,18 +333,15 @@ class MultiScanner:
     def scan_directory(self, root: str = ".") -> list[Dependency]:
         """Scan all dependency files in a directory."""
         deps = []
-        patterns = [
-            "Cargo.lock",
-            "package-lock.json",
-            "requirements.txt",
-            "go.mod",
-            "poetry.lock",
-            "*.lock",
-        ]
+        seen = set()
 
-        for pattern in patterns:
+        for pattern in LOCK_PATTERNS:
             for path in Path(root).rglob(pattern):
                 if path.is_file():
+                    resolved = path.resolve()
+                    if resolved in seen:
+                        continue
+                    seen.add(resolved)
                     deps.extend(self.scan_file(str(path)))
 
         return deps

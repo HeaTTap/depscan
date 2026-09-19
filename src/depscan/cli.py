@@ -188,7 +188,7 @@ def info():
         "[bold]Supported Ecosystems:[/bold]\n"
         "• cargo (Cargo.lock)\n"
         "• npm (package-lock.json)\n"
-        "• pypi (requirements.txt, poetry.lock)\n"
+        "• pypi (requirements.txt, poetry.lock, Pipfile.lock)\n"
         "• go (go.mod)\n\n"
         "[bold]Features:[/bold]\n"
         "• Multi-ecosystem scanning\n"
