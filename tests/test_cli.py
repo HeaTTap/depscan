@@ -37,3 +37,19 @@ def test_scan_markdown_output(tmp_path):
     result = run_depscan("scan", "--markdown", "--no-typosquat", str(tmp_path))
     assert result.returncode == 0, f"exit={result.returncode}\n{result.stdout}\n{result.stderr}"
     assert "# Dependency Scan Report" in result.stdout
+
+
+def test_check_invalid_name_rejects_injection(tmp_path):
+    """Security: malformed package names must be rejected without spawning subprocess."""
+    result = run_depscan("check", "foo; rm -rf /", "1.0.0")
+    assert result.returncode == 2, f"exit={result.returncode}\n{result.stderr}"
+
+def test_check_invalid_name_rejects_uri_scheme(tmp_path):
+    """Security: URI scheme names must be rejected."""
+    result = run_depscan("check", "file://etc/passwd", "1.0.0")
+    assert result.returncode == 2, f"exit={result.returncode}\n{result.stderr}"
+
+def test_check_valid_name_succeeds(tmp_path):
+    """Normal package names must work."""
+    result = run_depscan("check", "requests", "2.31.0")
+    assert result.returncode == 0, f"exit={result.returncode}\n{result.stderr}"

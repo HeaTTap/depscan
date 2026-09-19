@@ -14,6 +14,8 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 from depscan.scanner import MultiScanner, Dependency
 from depscan.formatter import MarkdownFormatter
 
+import re as _re
+
 console = Console()
 
 
@@ -165,6 +167,14 @@ def list_deps(path, json_out):
 @click.argument("version")
 def check(name, version):
     """Check a specific dependency for issues."""
+    # Security: strict validation prevents command injection
+    # if this function is ever wired into automated CI.
+    if not _re.match(r'^[a-zA-Z0-9_.\-/:@]+$', name):
+        console.print("[red]Invalid package name[/red]")
+        sys.exit(2)
+    if "://" in name or ";" in name or "|" in name or "&" in name or "$" in name:
+        console.print("[red]Invalid package name[/red]")
+        sys.exit(2)
     scanner = MultiScanner()
     dep = Dependency(name=name, version=version, ecosystem="unknown")
 
