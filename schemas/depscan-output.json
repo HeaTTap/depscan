@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/yunaremaia/depscan/main/schemas/depscan-output.json",
+  "title": "depscan scan --json-output",
+  "type": "object",
+  "properties": {
+    "total": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Total number of dependencies found across all lockfiles and manifests."
+    },
+    "typosquats": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "description": "The dependency name as written in the manifest." },
+          "version": { "type": "string", "description": "Pinned version of the dependency." },
+          "target": { "type": "string", "description": "The well-known package name it appears to imitate." }
+        },
+        "required": ["name", "version", "target"]
+      },
+      "description": "Dependencies whose names are near-misses of popular packages."
+    },
+    "by_ecosystem": {
+      "type": "object",
+      "additionalProperties": { "type": "integer", "minimum": 0 },
+      "description": "Dependency count per ecosystem (cargo, npm, pypi)."
+    }
+  },
+  "required": ["total", "typosquats", "by_ecosystem"]
+}

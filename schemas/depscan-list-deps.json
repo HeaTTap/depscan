@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/yunaremaia/depscan/main/schemas/depscan-list-deps.json",
+  "title": "depscan list-deps --json-output",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "properties": {
+      "name": { "type": "string", "description": "Dependency name." },
+      "version": { "type": "string", "description": "Pinned version from the lockfile or manifest." },
+      "ecosystem": {
+        "type": "string",
+        "enum": ["cargo", "npm", "pypi"],
+        "description": "Ecosystem the dependency was parsed from."
+      }
+    },
+    "required": ["name", "version", "ecosystem"]
+  }
+}

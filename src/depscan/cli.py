@@ -50,6 +50,7 @@ def scan(path, json_out, markdown_out, typosquat):
             sys.stdout = old_stdout
 
         output = {
+            "$schema": "https://raw.githubusercontent.com/yunaremaia/depscan/main/schemas/depscan-output.json",
             "total": results["total"],
             "typosquats": [
                 {"name": d.name, "version": d.version, "target": d.typosquat_target}
@@ -73,6 +74,7 @@ def scan(path, json_out, markdown_out, typosquat):
 
     if json_out:
         output = {
+            "$schema": "https://raw.githubusercontent.com/yunaremaia/depscan/main/schemas/depscan-output.json",
             "total": results["total"],
             "typosquats": [
                 {"name": d.name, "version": d.version, "target": d.typosquat_target}

@@ -108,8 +108,15 @@ Example:
 
 ## JSON Output
 
+Both JSON outputs include a `$schema` key pointing at the published schema, so consumers can validate before parsing.
+
+### `depscan scan --json-output`
+
+Validated by [schemas/depscan-output.json](schemas/depscan-output.json).
+
 ```json
 {
+  "$schema": "https://raw.githubusercontent.com/yunaremaia/depscan/main/schemas/depscan-output.json",
   "total": 42,
   "typosquats": [
     {
@@ -123,6 +130,44 @@ Example:
     "npm": 17
   }
 }
+```
+
+Fields:
+
+- `total` (integer) — total dependencies found across all lockfiles and manifests
+- `typosquats` (array) — dependencies whose names are near-misses of popular packages
+  - `name` — the dependency name as written in the manifest
+  - `version` — pinned version of the dependency
+  - `target` — the well-known package name it appears to imitate
+- `by_ecosystem` (object) — dependency count per ecosystem (`cargo`, `npm`, `pypi`)
+
+### `depscan list-deps --json-output`
+
+Validated by [schemas/depscan-list-deps.json](schemas/depscan-list-deps.json).
+
+```json
+[
+  {
+    "name": "requests",
+    "version": "2.31.0",
+    "ecosystem": "pypi"
+  }
+]
+```
+
+Fields:
+
+- `name` — dependency name
+- `version` — pinned version from the lockfile or manifest
+- `ecosystem` — one of `cargo`, `npm`, `pypi`
+
+### Validating output
+
+```bash
+depscan scan . --json-output | python3 -c "
+import json, sys, jsonschema
+jsonschema.validate(json.load(sys.stdin), json.load(open('schemas/depscan-output.json')))
+"
 ```
 
 ## Development
