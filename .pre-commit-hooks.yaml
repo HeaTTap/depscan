@@ -2,7 +2,7 @@
   name: Scan dependencies for typosquats
   entry: depscan scan
   language: python
-  files: '(Cargo\.lock|package-lock\.json|requirements\.txt|go\.mod|poetry\.lock)$'
+  files: '(Cargo\.lock|package-lock\.json|Pipfile\.lock|requirements\.txt|go\.mod|poetry\.lock)$'
   additional_dependencies:
     - "depscan>=0.1.0"
   args: ["--no-typosquat"]

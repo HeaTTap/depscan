@@ -6,7 +6,7 @@ Scan dependencies across multiple ecosystems with typosquat detection.
 
 - **Multi-ecosystem**: Cargo, npm, PyPI, Go
 - **Typosquat detection**: Levenshtein-based similarity check against known packages
-- **Multiple lockfile formats**: Cargo.lock, package-lock.json, requirements.txt, go.mod, poetry.lock
+- **Multiple lockfile formats**: Cargo.lock, package-lock.json, requirements.txt, go.mod, poetry.lock, Pipfile.lock
 - **JSON output**: For automation and CI integration
 - **Rich terminal output**: Tables, panels, progress bars
 
@@ -54,6 +54,7 @@ depscan info
 | npm | package-lock.json | ✅ |
 | PyPI | requirements.txt | ✅ |
 | PyPI | poetry.lock | ✅ |
+| PyPI | Pipfile.lock | ✅ |
 | Go | go.mod | ✅ |
 
 ## CLI Reference

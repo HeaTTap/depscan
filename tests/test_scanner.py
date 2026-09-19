@@ -114,6 +114,70 @@ version = "5.3.0"
         deps = self.parser.parse_poetry_lock(content)
         assert len(deps) == 2
 
+    def test_pipfile_lock_parsing(self):
+        content = '''
+{
+    "_meta": {
+        "hash": {"sha256": "abcdef"},
+        "pipfile-spec": 6,
+        "requires": {"python_version": "3.11"}
+    },
+    "default": {
+        "requests": {
+            "hashes": ["sha256:1234"],
+            "index": "pypi",
+            "version": "==2.31.0"
+        },
+        "urllib3": {
+            "hashes": ["sha256:5678"],
+            "version": "==2.0.4"
+        },
+        "certifi": {
+            "hashes": ["sha256:9012"],
+            "version": "==2023.7.22"
+        }
+    },
+    "develop": {
+        "pytest": {
+            "hashes": ["sha256:3456"],
+            "version": "==7.4.0"
+        },
+        "black": {
+            "hashes": ["sha256:7890"],
+            "version": "==23.7.0"
+        }
+    }
+}
+'''
+        deps = self.parser.parse_pipfile_lock(content)
+        assert len(deps) == 5
+        names = {d.name for d in deps}
+        assert names == {"requests", "urllib3", "certifi", "pytest", "black"}
+        for d in deps:
+            assert d.ecosystem == "pypi"
+
+    def test_pipfile_lock_uses_exact_versions(self):
+        content = '''
+{
+    "default": {
+        "requests": {"version": "==2.31.0"}
+    }
+}
+'''
+        deps = self.parser.parse_pipfile_lock(content)
+        assert len(deps) == 1
+        assert deps[0].name == "requests"
+        assert deps[0].version == "2.31.0"
+
+    def test_pipfile_lock_malformed_json(self):
+        content = "{ invalid json"
+        deps = self.parser.parse_pipfile_lock(content)
+        assert deps == []
+
+    test_plfile_lock_parsing = test_pipfile_lock_parsing
+    test_plfile_lock_uses_exact_versions = test_pipfile_lock_uses_exact_versions
+    test_plfile_lock_malformed_json = test_pipfile_lock_malformed_json
+
 
 class TestMultiScanner:
     def setup_method(self):
@@ -146,6 +210,21 @@ class TestScanDirectory:
         scanner = MultiScanner()
         deps = scanner.scan_directory(str(tmp_path))
         assert len(deps) >= 1
+
+    def test_scan_pipfile_lock(self, tmp_path):
+        lock_file = tmp_path / "Pipfile.lock"
+        lock_file.write_text('{"default": {"requests": {"version": "==2.31.0"}}}')
+        scanner = MultiScanner()
+        deps = scanner.scan_file(str(lock_file))
+        assert len(deps) == 1
+        assert deps[0].name == "requests"
+        assert deps[0].version == "2.31.0"
+        assert deps[0].ecosystem == "pypi"
+
+        dir_deps = scanner.scan_directory(str(tmp_path))
+        assert len(dir_deps) == 1
+        assert dir_deps[0].name == "requests"
+
 
 
 class TestDependency:
