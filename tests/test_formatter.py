@@ -13,7 +13,7 @@ def test_format_summary_basic():
     assert "5" in md
     assert "| npm |" in md
     assert "| cargo |" in md
-    assert "✅ Scan Complete" in md
+    assert "✅ Scan Complete" in md or "[OK] Scan Complete" in md
 
 
 def test_format_summary_with_typosquats():

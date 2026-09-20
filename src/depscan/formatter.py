@@ -47,7 +47,7 @@ class MarkdownFormatter:
             lines.append("")
 
         if not typosquats and total > 0:
-            lines.append("## ✅ Scan Complete")
+            lines.append("## [OK] Scan Complete")
             lines.append("")
             lines.append("No typosquats detected. All dependencies appear legitimate.")
             lines.append("")
