@@ -9,6 +9,22 @@ from datetime import datetime
 from pathlib import Path
 from typing import Iterator
 
+# Strict allowlist for package names: only alphanumeric characters, dots, hyphens,
+# and underscores are permitted.  Anything else (semicolons, pipes, spaces, …)
+# would indicate an injection attempt and is rejected before any subprocess call.
+SAFE_PACKAGE_NAME_RE = re.compile(r'^[a-zA-Z0-9._-]+$')
+
+
+def validate_package_name(name: str) -> None:
+    """Validate *name* against the safe-package-name allowlist.
+
+    Raises:
+        ValueError: If *name* contains characters outside ``[a-zA-Z0-9._-]``.
+    """
+    if not SAFE_PACKAGE_NAME_RE.match(name):
+        raise ValueError("Invalid package name")
+
+
 LOCK_PATTERNS = [
     "Cargo.lock",
     "package-lock.json",
@@ -450,3 +466,36 @@ class MultiScanner:
                 results["typosquats"].append(dep)
 
         return results
+
+
+def check(package: str) -> dict:
+    """Run ``npm audit`` against a single *package* name and return the parsed JSON.
+
+    The package name is validated with :func:`validate_package_name` before it is
+    passed to the subprocess so that shell-injection attacks are impossible even
+    when ``shell=False`` is used.
+
+    Args:
+        package: The npm package name to audit (e.g. ``"lodash"``).
+
+    Returns:
+        The parsed JSON output from ``npm audit``.
+
+    Raises:
+        ValueError: If *package* contains characters not allowed by
+            :data:`SAFE_PACKAGE_NAME_RE`.
+        subprocess.CalledProcessError: If ``npm audit`` exits with a non-zero
+            status code.
+    """
+    validate_package_name(package)
+    result = subprocess.run(
+        ["npm", "audit", "--json", package],
+        shell=False,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    try:
+        return json.loads(result.stdout)
+    except json.JSONDecodeError:
+        return {"error": result.stderr or result.stdout, "returncode": result.returncode}

@@ -1,8 +1,17 @@
 """Tests for dependency scanner."""
 import pytest
 from pathlib import Path
+from unittest.mock import patch
 
-from depscan.scanner import MultiScanner, DependencyParser, Dependency, Vulnerability
+from depscan.scanner import (
+    MultiScanner,
+    DependencyParser,
+    Dependency,
+    Vulnerability,
+    validate_package_name,
+    check,
+    SAFE_PACKAGE_NAME_RE,
+)
 
 
 class TestDependencyParser:
@@ -416,3 +425,105 @@ class TestDependency:
             Vulnerability(id="GHSA-xxx", severity="HIGH", description="test")
         )
         assert dep.is_vulnerable is True
+
+
+class TestPackageNameValidation:
+    """Tests for validate_package_name() and the check() subprocess guard.
+
+    These tests exercise the security boundary introduced to prevent
+    package-name injection into subprocess calls (issue #119).
+    """
+
+    # --- validate_package_name ---
+
+    @pytest.mark.parametrize("malicious_name", [
+        "; rm -rf /",
+        "lodash; rm -rf /",
+        "pkg | cat /etc/passwd",
+        "pkg && evil",
+        "pkg\necho pwned",
+        "pkg$(whoami)",
+        "pkg`id`",
+        "pkg >out.txt",
+        "pkg <in.txt",
+        "pkg$PATH",
+        "pkg name",          # space is not allowed
+        "pkg/subdir",        # forward-slash is not allowed
+        "pkg\\evil",         # backslash is not allowed
+        "",                  # empty string
+        "\x00pkg",           # null byte
+    ])
+    def test_validate_package_name_raises_for_malicious_input(self, malicious_name):
+        """validate_package_name() must raise ValueError for any name that
+        contains characters outside the safe [a-zA-Z0-9._-] allowlist."""
+        with pytest.raises(ValueError, match="Invalid package name"):
+            validate_package_name(malicious_name)
+
+    @pytest.mark.parametrize("safe_name", [
+        "lodash",
+        "react",
+        "my-package",
+        "my_package",
+        "my.package",
+        "Pkg123",
+        "pkg-0.1.0",
+        "@",               # edge: single allowed-adjacent char — rejected by regex
+    ])
+    def test_validate_package_name_accepts_safe_names(self, safe_name):
+        """Names composed solely of [a-zA-Z0-9._-] must not raise."""
+        # "@" is NOT in the allowlist — skip it so we only test truly safe names.
+        if not SAFE_PACKAGE_NAME_RE.match(safe_name):
+            pytest.skip(f"{safe_name!r} is intentionally outside the allowlist")
+        # Should not raise
+        validate_package_name(safe_name)
+
+    # --- check() ---
+
+    def test_check_raises_value_error_for_malicious_package_name(self):
+        """check() must raise ValueError — and must NOT invoke subprocess —
+        when the package name is malicious (e.g. contains shell metacharacters).
+        This is the primary acceptance criterion for issue #119.
+        """
+        with patch("depscan.scanner.subprocess.run") as mock_run:
+            with pytest.raises(ValueError, match="Invalid package name"):
+                check("; rm -rf /")
+            # The subprocess must never have been called
+            mock_run.assert_not_called()
+
+    def test_check_raises_for_semicolon_injection(self):
+        """Semicolons are a classic shell-injection vector and must be rejected."""
+        with patch("depscan.scanner.subprocess.run"):
+            with pytest.raises(ValueError, match="Invalid package name"):
+                check("lodash; rm -rf /")
+
+    def test_check_raises_for_pipe_injection(self):
+        """Pipe characters must be rejected."""
+        with patch("depscan.scanner.subprocess.run"):
+            with pytest.raises(ValueError, match="Invalid package name"):
+                check("pkg | cat /etc/passwd")
+
+    def test_check_raises_for_empty_string(self):
+        """An empty package name must be rejected."""
+        with patch("depscan.scanner.subprocess.run"):
+            with pytest.raises(ValueError, match="Invalid package name"):
+                check("")
+
+    def test_check_calls_subprocess_with_list_and_no_shell(self):
+        """When given a *valid* package name, check() must call subprocess.run
+        with a list of arguments and shell=False (never shell=True)."""
+        import json as _json
+        fake_result = type("R", (), {
+            "stdout": _json.dumps({"vulnerabilities": {}}),
+            "stderr": "",
+            "returncode": 0,
+        })()
+        with patch("depscan.scanner.subprocess.run", return_value=fake_result) as mock_run:
+            result = check("lodash")
+            args, kwargs = mock_run.call_args
+            # First positional arg must be a list (not a string)
+            assert isinstance(args[0], list), "subprocess.run must receive a list, not a string"
+            # shell must be explicitly False
+            assert kwargs.get("shell") is False, "shell=True would re-introduce the injection vector"
+            # package name must appear in the argument list
+            assert "lodash" in args[0]
+        assert result == {"vulnerabilities": {}}
