@@ -13,10 +13,11 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 
 from depscan.scanner import MultiScanner, Dependency
 from depscan.formatter import MarkdownFormatter
+from depscan.sarif import to_sarif, findings_from_scan_results
 
 import re as _re
 
-console = Console()
+console = Console(safe_box=True)
 
 
 def _truncate(text: str, length: int = 40) -> str:
@@ -35,14 +36,38 @@ def cli():
 
 @cli.command()
 @click.argument("path", default=".", type=click.Path(exists=True))
-@click.option("--json-output", "json_out", is_flag=True, help="Output as JSON")
-@click.option("--markdown", "markdown_out", is_flag=True, help="Output as Markdown report")
+@click.option("--json-output", "json_out", is_flag=True, help="Output as JSON (deprecated: use --format json)")
+@click.option("--markdown", "markdown_out", is_flag=True, help="Output as Markdown report (deprecated: use --format markdown)")
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["text", "json", "markdown", "sarif"], case_sensitive=False),
+    default="text",
+    help="Output format: text (default), json, markdown, or sarif (SARIF 2.1.0 for GitHub Code Scanning).",
+)
 @click.option("--typosquat/--no-typosquat", default=True, help="Check for typosquats")
-def scan(path, json_out, markdown_out, typosquat):
+def scan(path, json_out, markdown_out, output_format, typosquat):
     """Scan a directory for dependencies."""
     scanner = MultiScanner()
 
-    if json_out:
+    # Normalise legacy flags into output_format so we have a single code path.
+    if json_out and output_format == "text":
+        output_format = "json"
+    if markdown_out and output_format == "text":
+        output_format = "markdown"
+
+    # SARIF output: scan then emit SARIF 2.1.0 to stdout — no progress spinner
+    # so the output can be piped directly to a file.
+    if output_format == "sarif":
+        results = scanner.scan_and_check(path)
+        findings = findings_from_scan_results(results)
+        sarif_doc = to_sarif(findings, repo_root=path)
+        click.echo(json.dumps(sarif_doc, indent=2))
+        if results.get("typosquats") or results.get("vulnerable"):
+            sys.exit(1)
+        return
+
+    if output_format == "json":
         import io
         old_stdout = sys.stdout
         sys.stdout = io.StringIO()
@@ -74,20 +99,7 @@ def scan(path, json_out, markdown_out, typosquat):
         results = scanner.scan_and_check(path)
         progress.update(task, completed=True)
 
-    if json_out:
-        output = {
-            "$schema": "https://raw.githubusercontent.com/yunaremaia/depscan/main/schemas/depscan-output.json",
-            "total": results["total"],
-            "typosquats": [
-                {"name": d.name, "version": d.version, "target": d.typosquat_target}
-                for d in results["typosquats"]
-            ],
-            "by_ecosystem": results["by_ecosystem"],
-        }
-        click.echo(json.dumps(output, indent=2))
-        return
-
-    if markdown_out:
+    if output_format == "markdown":
         formatter = MarkdownFormatter()
         click.echo(formatter.format_full(results))
         if results["typosquats"]:
@@ -182,14 +194,14 @@ def check(name, version):
 
     if is_typosquat:
         console.print(Panel(
-            f"[red]⚠ Potential typosquat detected![/red]\n"
+            f"[red][!] Potential typosquat detected![/red]\n"
             f"[bold]{name}[/bold] is similar to [bold]{dep.typosquat_target}[/bold]",
-            title="depscan — Check"
+            title="depscan - Check"
         ))
     else:
         console.print(Panel(
-            f"[green]✓ {name}@{version} — no issues detected[/green]",
-            title="depscan — Check"
+            f"[green][OK] {name}@{version} - no issues detected[/green]",
+            title="depscan - Check"
         ))
 
 

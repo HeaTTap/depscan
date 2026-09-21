@@ -4,6 +4,7 @@ src/depscan/__init__.py
 src/depscan/__main__.py
 src/depscan/cli.py
 src/depscan/formatter.py
+src/depscan/sarif.py
 src/depscan/scanner.py
 src/depscan.egg-info/PKG-INFO
 src/depscan.egg-info/SOURCES.txt
@@ -13,4 +14,5 @@ src/depscan.egg-info/requires.txt
 src/depscan.egg-info/top_level.txt
 tests/test_cli.py
 tests/test_formatter.py
+tests/test_sarif.py
 tests/test_scanner.py
