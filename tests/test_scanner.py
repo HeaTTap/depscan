@@ -237,6 +237,38 @@ numpy==1.24.0
         deps = self.parser.parse_requirements_txt(content)
         assert len(deps) == 3
 
+    def test_parse_requirements_txt_operators(self):
+        content = '''
+# Comments should be ignored
+numpy~=1.24.0
+pandas<=1.5.0
+django>3.0.0
+celery<5.0.0
+redis!=4.0.0
+requests == 2.28.0 # inline comment
+flask >= 2.0.0
+'''
+        deps = self.parser.parse_requirements_txt(content)
+        assert len(deps) == 7
+        dep_map = {d.name: (d.version, d.ecosystem) for d in deps}
+        assert dep_map["numpy"] == ("1.24.0", "pypi")
+        assert dep_map["pandas"] == ("1.5.0", "pypi")
+        assert dep_map["django"] == ("3.0.0", "pypi")
+        assert dep_map["celery"] == ("5.0.0", "pypi")
+        assert dep_map["redis"] == ("4.0.0", "pypi")
+        assert dep_map["requests"] == ("2.28.0", "pypi")
+        assert dep_map["flask"] == ("2.0.0", "pypi")
+
+    def test_parse_requirements_txt_empty_and_ignored(self):
+        content = '''
+# just a comment
+--index-url https://pypi.org/simple
+-r base.txt
+
+'''
+        assert self.parser.parse_requirements_txt(content) == []
+        assert self.parser.parse_requirements_txt("") == []
+
     def test_parse_go_mod(self):
         content = '''
 require (

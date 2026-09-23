@@ -14,6 +14,8 @@ from typing import Iterator
 # would indicate an injection attempt and is rejected before any subprocess call.
 SAFE_PACKAGE_NAME_RE = re.compile(r'^[a-zA-Z0-9._-]+$')
 
+_REQUIREMENTS_RE = re.compile(r"^([A-Za-z0-9_.-]+)\s*(==|>=|<=|>|<|!=|~=)\s*(.+?)\s*$")
+
 
 def validate_package_name(name: str) -> None:
     """Validate *name* against the safe-package-name allowlist.
@@ -214,21 +216,14 @@ class DependencyParser:
         """Parse requirements.txt."""
         deps = []
         for line in content.splitlines():
-            line = line.strip()
-            if not line or line.startswith("#"):
+            line = line.partition("#")[0].strip()
+            if not line:
                 continue
-            if "==" in line:
-                name, _, version = line.partition("==")
+            match = _REQUIREMENTS_RE.match(line)
+            if match:
                 deps.append(Dependency(
-                    name=name.strip(),
-                    version=version.strip(),
-                    ecosystem="pypi",
-                ))
-            elif ">=" in line:
-                name, _, version = line.partition(">=")
-                deps.append(Dependency(
-                    name=name.strip(),
-                    version=version.strip(),
+                    name=match.group(1).strip(),
+                    version=match.group(3).strip(),
                     ecosystem="pypi",
                 ))
         return deps
